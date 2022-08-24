@@ -67,16 +67,14 @@ if __name__ == '__main__':
     np.random.seed(1)
 
     # Data, Config
-    data_path = Path('/Users/Will/Desktop/Here/Summer22/BayesOmicsLab/ICEWERX/outlier-exposure/' +
-                     '_UrbanSounds/UrbanSounds8K/audio')
-    annotations_path = Path('/Users/Will/Desktop/Here/Summer22/BayesOmicsLab/ICEWERX/outlier-exposure/' +
-                     '_UrbanSounds/UrbanSounds8K/metadata/UrbanSound8K.csv')
+    data_path = Path('/scratch/dca18002/dwerx/data/audio/UrbanSound8k/audio')
+    annotations_path = Path('/scratch/dca18002/dwerx/data/audio/UrbanSound8k/metadata/UrbanSound8k.csv')
     sample_rate = 22050
     num_samples = 88200
     seed = 43
 
     if args.ngpu > 0:
-        device = torch.device('mps')
+        device = torch.device('cuda')
     if args.ngpu == 0:
         device = 'cpu'
 
