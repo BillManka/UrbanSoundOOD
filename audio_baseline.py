@@ -17,6 +17,7 @@ if __name__ == '__main__':
     from tqdm import tqdm
 #    from models.allconv import AllConvNet
     from models.wrn import WideResNet
+    from models.valerdo import CNNNetwork
 #    from models.melspecnet import MelSpecNet
     from torch.utils.data import Dataset, DataLoader, Subset, random_split
     from pathlib import Path
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('dataset', type=str, choices=['cifar10', 'cifar100', 'custom'],
                         help="Specify 'custom'")
     parser.add_argument('--model', '-m', type=str, default='allconv',
-                        choices=['allconv', 'wrn', 'pretrained_resnet'], help='Choose architecture.')
+                        choices=['allconv', 'wrn', 'valerdo'], help='Choose architecture.')
     parser.add_argument('--calibration', '-c', action='store_true',
                         help='Train a model to be used for calibration. This holds out some data for validation.')
     # Optimization options
@@ -123,10 +124,8 @@ if __name__ == '__main__':
     num_classes = 10
     if args.model == 'allconv':
         net = AllConvNet(num_classes)
-    elif args.model == 'melspecnet':
-        net = MelSpecNet(num_classes)
-    elif args.model == 'pretrained_resnet':
-        net = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+    elif args.model == 'valerdo':
+        net = CNNNetwork()
     else:
         net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate)
 
@@ -155,24 +154,25 @@ if __name__ == '__main__':
     net.to(device)
     print(net)
 
+    optimizer = torch.optim.Adam(net.parameters(), args.learning_rate)
     # cudnn.benchmark = True  # fire on all cylinders
 
-    optimizer = torch.optim.SGD(
-        net.parameters(), state['learning_rate'], momentum=state['momentum'],
-        weight_decay=state['decay'], nesterov=True)
+#    optimizer = torch.optim.SGD(
+#        net.parameters(), state['learning_rate'], momentum=state['momentum'],
+#        weight_decay=state['decay'], nesterov=True)
+#
+#
+#    def cosine_annealing(step, total_steps, lr_max, lr_min):
+#        return lr_min + (lr_max - lr_min) * 0.5 * (
+#                1 + np.cos(step / total_steps * np.pi))
 
-
-    def cosine_annealing(step, total_steps, lr_max, lr_min):
-        return lr_min + (lr_max - lr_min) * 0.5 * (
-                1 + np.cos(step / total_steps * np.pi))
-
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lr_lambda=lambda step: cosine_annealing(
-            step,
-            args.epochs * len(train_loader),
-            1,  # since lr_lambda computes multiplicative factor
-            1e-6 / args.learning_rate))
+#    scheduler = torch.optim.lr_scheduler.LambdaLR(
+#        optimizer,
+#        lr_lambda=lambda step: cosine_annealing(
+#            step,
+#            args.epochs * len(train_loader),
+#            1,  # since lr_lambda computes multiplicative factor
+#            1e-6 / args.learning_rate))
 
 
     # /////////////// Training ///////////////
@@ -192,7 +192,7 @@ if __name__ == '__main__':
             loss = F.cross_entropy(x, target)
             loss.backward()
             optimizer.step()
-            scheduler.step()
+            # scheduler.step()
 
             # exponential moving average
             loss_avg = loss_avg * 0.8 + float(loss) * 0.2
@@ -222,7 +222,6 @@ if __name__ == '__main__':
 
         state['test_loss'] = loss_avg / len(test_loader)
         state['test_accuracy'] = correct / len(test_loader.dataset)
-
 
     if args.test:
         test()
