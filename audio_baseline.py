@@ -120,7 +120,7 @@ if __name__ == '__main__':
     # plt.show()
 
     #Create model
-    num_classes = 9
+    num_classes = 10
     if args.model == 'allconv':
         net = AllConvNet(num_classes)
     elif args.model == 'melspecnet':

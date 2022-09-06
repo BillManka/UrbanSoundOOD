@@ -1,2 +1,5 @@
 __pychache__/
 UrbanSound8K/
+*.swp
+slurm*
+*.pyc

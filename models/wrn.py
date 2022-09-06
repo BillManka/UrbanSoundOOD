@@ -87,14 +87,15 @@ class WideResNet(nn.Module):
 
     def forward(self, x):
         out = self.conv1(x)
-        print(out.shape)
+        # print(out.shape)
         out = self.block1(out)
         out = self.block2(out)
         out = self.block3(out)
         out = self.relu(self.bn1(out))
-        print(out.shape)
+        # print(out.shape)
         out = F.avg_pool2d(out, 16)
-        print(out.shape)
+        # print(out.shape)
+        out = torch.mean(out, dim=3).unsqueeze(3)     # hacky hard-code pool dim 3
         out = out.view(-1, self.nChannels)
-        print(out.shape)
+        # print(out.shape)
         return self.fc(out)
