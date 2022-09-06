@@ -52,14 +52,17 @@ class CNNNetwork(nn.Module):
         )
         self.flatten = nn.Flatten()
         self.linear = nn.Linear(128 * 5 * 4, 10)
-        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, input_data):
+        print(input_data.shape)
         x = self.conv1(input_data)
+        print(x.shape)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
+        print(x.shape)
         x = self.flatten(x)
+        print(x.shape)
         x = self.linear(x)
         return x
 
