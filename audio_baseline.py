@@ -78,11 +78,11 @@ if __name__ == '__main__':
     if args.ngpu == 0:
         device = 'cpu'
 
-    label_map = {
-        'air_conditioner': 0, 'car_horn': 1, 'children_playing': 2, 'dog_bark': 3,
-        'drilling': 4, 'engine_idling': 5, 'gun_shot': 6, 'jackhammer': 7, 'siren': 8,
-        'street_music': 9
-    }
+#    label_map = {
+#        'air_conditioner': 0, 'car_horn': 1, 'children_playing': 2, 'dog_bark': 3,
+#        'drilling': 4, 'engine_idling': 5, 'gun_shot': 6, 'jackhammer': 7, 'siren': 8,
+#        'street_music': 9
+#    }
 
 
     mel_spectrogram = torchaudio.transforms.MelSpectrogram(
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     net.to(device)
     print(net)
 
-    optimizer = torch.optim.Adam(net.parameters(), args.learning_rate)
+    optimizer = torch.optim.AdamW(net.parameters(), args.learning_rate)
     # cudnn.benchmark = True  # fire on all cylinders
 
 #    optimizer = torch.optim.SGD(

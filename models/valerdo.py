@@ -51,7 +51,7 @@ class CNNNetwork(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.flatten = nn.Flatten()
-        self.linear = nn.Linear(128 * 5 * 4, 10)
+        self.linear = nn.Linear(128 * 5 * 12, 10)
 
     def forward(self, input_data):
         print(input_data.shape)
