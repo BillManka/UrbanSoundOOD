@@ -67,8 +67,8 @@ if __name__ == '__main__':
     np.random.seed(1)
 
     # Data, Config
-    data_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio')
-    annotations_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/UrbanSound8K.csv')
+    data_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_in')
+    annotations_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/reduced.csv')
     sample_rate = 22050
     num_samples = 88200
     seed = 43
@@ -77,6 +77,7 @@ if __name__ == '__main__':
         device = torch.device('cuda')
     if args.ngpu == 0:
         device = 'cpu'
+
 
 #    label_map = {
 #        'air_conditioner': 0, 'car_horn': 1, 'children_playing': 2, 'dog_bark': 3,

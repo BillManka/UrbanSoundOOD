@@ -14,24 +14,28 @@ from models.wrn import WideResNet
 from skimage.filters import gaussian as gblur
 from PIL import Image as PILImage
 
+# UrbanSound-specific imports
+from models.valerdo import CNNNetwork
+from urbansounddataset import UrbanSoundDataset
+
 # go through rigamaroo to do ...utils.display_results import show_performance
 if __package__ is None:
-    import sys
-    from os import path
+import sys
+from os import path
 
-    sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
-    from utils.display_results import show_performance, get_measures, print_measures, print_measures_with_std
-    import utils.svhn_loader as svhn
-    import utils.lsun_loader as lsun_loader
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+from utils.display_results import show_performance, get_measures, print_measures, print_measures_with_std
+import utils.svhn_loader as svhn
+import utils.lsun_loader as lsun_loader
 
-parser = argparse.ArgumentParser(description='Evaluates a CIFAR OOD Detector',
-                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser = argparse.ArgumentParser(description='Evaluates an audio OOD Detector',
+			 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 # Setup
 parser.add_argument('--test_bs', type=int, default=200)
 parser.add_argument('--num_to_avg', type=int, default=1, help='Average measures across num_to_avg runs.')
 parser.add_argument('--validate', '-v', action='store_true', help='Evaluate performance on validation distributions.')
 parser.add_argument('--use_xent', '-x', action='store_true', help='Use cross entropy scoring instead of the MSP.')
-parser.add_argument('--method_name', '-m', type=str, default='cifar10_allconv_baseline', help='Method name.')
+parser.add_argument('--', '-m', type=str, default='cifar10_allconv_baseline', help='Method name.')
 # Loading details
 parser.add_argument('--layers', default=40, type=int, help='total number of layers')
 parser.add_argument('--widen-factor', default=2, type=int, help='widen factor')
@@ -43,6 +47,12 @@ args = parser.parse_args()
 
 # torch.manual_seed(1)
 # np.random.seed(1)
+if args.ngpu > 0:
+    device = torch.device('cuda')
+if args.ngpu == 0:
+    device = 'cpu'
+
+
 
 # mean and standard deviation of channels of CIFAR-10 images
 mean = [x / 255 for x in [125.3, 123.0, 113.9]]
@@ -57,9 +67,22 @@ else:
     test_data = dset.CIFAR100('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
     num_classes = 100
 
+### TODO ###
+mel_spectrogram = torchaudio.transforms.MelSpectrogram(
+        sample_rate=sample_rate,
+        n_fft=1024,
+        hop_length=512,
+        n_mels=64
+)
 
-test_loader = torch.utils.data.DataLoader(test_data, batch_size=args.test_bs, shuffle=False,
-                                          num_workers=args.prefetch, pin_memory=True)
+sample_rate = 22050
+num_samples = 88200
+test_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_in'
+annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/reduced.csv'
+usd_in = UrbanSoundDataset(annotations_path, test_path, mel_spectrogram, sample_rate,
+        num_samples, device=device)
+test_loader = DataLoader(usd_in)
+
 
 # Create model
 if 'allconv' in args.method_name:
@@ -181,6 +204,11 @@ def get_and_print_results(ood_loader, num_to_avg=args.num_to_avg):
         print_measures_with_std(aurocs, auprs, fprs, args.method_name)
     else:
         print_measures(auroc, aupr, fpr, args.method_name)
+
+# /////////////// AUDIO - Gunshot //////////////
+ood_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_out'
+
+
 
 
 # /////////////// Gaussian Noise ///////////////
