@@ -14,13 +14,15 @@ class UrbanSoundDataset(Dataset):
                  transformation,
                  target_sample_rate,
                  num_samples,
-                 device):
+                 device,
+                 ood=False):
         self.annotations = pd.read_csv(annotations_file)
         self.audio_dir = audio_dir
         self.device = device
         self.transformation = transformation.to(self.device)
         self.target_sample_rate = target_sample_rate
         self.num_samples = num_samples
+        self.ood = ood
 
     def __len__(self):
         return len(self.annotations)
@@ -62,9 +64,12 @@ class UrbanSoundDataset(Dataset):
         return signal
 
     def _get_audio_sample_path(self, index):
-        fold = f"fold{self.annotations.iloc[index, 5]}"
-        path = os.path.join(self.audio_dir, fold, self.annotations.iloc[
-            index, 0])
+        if self.ood == False:
+            fold = f"fold{self.annotations.iloc[index, 5]}"
+            path = os.path.join(self.audio_dir, fold, self.annotations.iloc[
+                index, 0])
+        else:
+            path = os.path.join(self.audio_dir, self.annotations.iloc[index, 0])
         return path
 
     def _get_audio_sample_label(self, index):

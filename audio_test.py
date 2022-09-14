@@ -9,24 +9,22 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as trn
 import torchvision.datasets as dset
 import torch.nn.functional as F
-from models.allconv import AllConvNet
-from models.wrn import WideResNet
-from skimage.filters import gaussian as gblur
 from PIL import Image as PILImage
+
+from torch.utils.data import Dataset, DataLoader
+import pandas as pd
+import torchaudio
 
 # UrbanSound-specific imports
 from models.valerdo import CNNNetwork
 from urbansounddataset import UrbanSoundDataset
 
-# go through rigamaroo to do ...utils.display_results import show_performance
 if __package__ is None:
-import sys
-from os import path
+    import sys
+    from os import path
 
-sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
-from utils.display_results import show_performance, get_measures, print_measures, print_measures_with_std
-import utils.svhn_loader as svhn
-import utils.lsun_loader as lsun_loader
+    sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+    from utils.display_results import show_performance, get_measures, print_measures, print_measures_with_std
 
 parser = argparse.ArgumentParser(description='Evaluates an audio OOD Detector',
 			 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -35,7 +33,7 @@ parser.add_argument('--test_bs', type=int, default=200)
 parser.add_argument('--num_to_avg', type=int, default=1, help='Average measures across num_to_avg runs.')
 parser.add_argument('--validate', '-v', action='store_true', help='Evaluate performance on validation distributions.')
 parser.add_argument('--use_xent', '-x', action='store_true', help='Use cross entropy scoring instead of the MSP.')
-parser.add_argument('--', '-m', type=str, default='cifar10_allconv_baseline', help='Method name.')
+parser.add_argument('--method_name', '-m', type=str, default='cifar10_allconv_baseline', help='Method name.')
 # Loading details
 parser.add_argument('--layers', default=40, type=int, help='total number of layers')
 parser.add_argument('--widen-factor', default=2, type=int, help='widen factor')
@@ -54,20 +52,8 @@ if args.ngpu == 0:
 
 
 
-# mean and standard deviation of channels of CIFAR-10 images
-mean = [x / 255 for x in [125.3, 123.0, 113.9]]
-std = [x / 255 for x in [63.0, 62.1, 66.7]]
-
-test_transform = trn.Compose([trn.ToTensor(), trn.Normalize(mean, std)])
-
-if 'cifar10_' in args.method_name:
-    test_data = dset.CIFAR10('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
-    num_classes = 10
-else:
-    test_data = dset.CIFAR100('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
-    num_classes = 100
-
-### TODO ###
+sample_rate = 22050
+num_samples = 88200
 mel_spectrogram = torchaudio.transforms.MelSpectrogram(
         sample_rate=sample_rate,
         n_fft=1024,
@@ -75,23 +61,17 @@ mel_spectrogram = torchaudio.transforms.MelSpectrogram(
         n_mels=64
 )
 
-sample_rate = 22050
-num_samples = 88200
 test_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_in'
-annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/reduced.csv'
+annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/in_annotations.csv'
 usd_in = UrbanSoundDataset(annotations_path, test_path, mel_spectrogram, sample_rate,
         num_samples, device=device)
 test_loader = DataLoader(usd_in)
 
 
-# Create model
-if 'allconv' in args.method_name:
-    net = AllConvNet(num_classes)
-else:
-    net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate)
+net = CNNNetwork()
+
 
 start_epoch = 0
-
 # Restore model
 if args.load != '':
     for i in range(1000 - 1, -1, -1):
@@ -124,8 +104,8 @@ cudnn.benchmark = True  # fire on all cylinders
 
 # /////////////// Detection Prelims ///////////////
 
-ood_num_examples = len(test_data) // 5
-expected_ap = ood_num_examples / (ood_num_examples + len(test_data))
+ood_num_examples = len(usd_in) // 5
+expected_ap = ood_num_examples / (ood_num_examples + len(usd_in))
 
 concat = lambda x: np.concatenate(x, axis=0)
 to_np = lambda x: x.data.cpu().numpy()
@@ -176,10 +156,6 @@ num_right = len(right_score)
 num_wrong = len(wrong_score)
 print('Error Rate {:.2f}'.format(100 * num_wrong / (num_wrong + num_right)))
 
-# /////////////// End Detection Prelims ///////////////
-
-print('\nUsing CIFAR-10 as typical data') if num_classes == 10 else print('\nUsing CIFAR-100 as typical data')
-
 # /////////////// Error Detection ///////////////
 
 print('\n\nError Detection')
@@ -208,7 +184,7 @@ def get_and_print_results(ood_loader, num_to_avg=args.num_to_avg):
 
 
 # /////////////// AUDIO - Gunshot //////////////
-ood_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_out'
+ood_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_ood'
 
 ood_annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/out_annotations.csv'
 usd_out = UrbanSoundDataset(ood_annotations_path, ood_path, mel_spectrogram, sample_rate,
@@ -230,232 +206,3 @@ get_and_print_results(ood_loader)
 #print('\n\nGaussian Noise (sigma = 0.5) Detection')
 #get_and_print_results(ood_loader)
 #
-## /////////////// Rademacher Noise ///////////////
-#
-#dummy_targets = torch.ones(ood_num_examples * args.num_to_avg)
-#ood_data = torch.from_numpy(np.random.binomial(
-#    n=1, p=0.5, size=(ood_num_examples * args.num_to_avg, 3, 32, 32)).astype(np.float32)) * 2 - 1
-#ood_data = torch.utils.data.TensorDataset(ood_data, dummy_targets)
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True)
-#
-#print('\n\nRademacher Noise Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Blob ///////////////
-#
-#ood_data = np.float32(np.random.binomial(n=1, p=0.7, size=(ood_num_examples * args.num_to_avg, 32, 32, 3)))
-#for i in range(ood_num_examples * args.num_to_avg):
-#    ood_data[i] = gblur(ood_data[i], sigma=1.5, multichannel=False)
-#    ood_data[i][ood_data[i] < 0.75] = 0.0
-#
-#dummy_targets = torch.ones(ood_num_examples * args.num_to_avg)
-#ood_data = torch.from_numpy(ood_data.transpose((0, 3, 1, 2))) * 2 - 1
-#ood_data = torch.utils.data.TensorDataset(ood_data, dummy_targets)
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nBlob Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Textures ///////////////
-#
-#ood_data = dset.ImageFolder(root="/share/data/vision-greg2/users/dan/datasets/dtd/images",
-#                            transform=trn.Compose([trn.Resize(32), trn.CenterCrop(32),
-#                                                   trn.ToTensor(), trn.Normalize(mean, std)]))
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nTexture Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// SVHN ///////////////
-#
-#ood_data = svhn.SVHN(root='/share/data/vision-greg/svhn/', split="test",
-#                     transform=trn.Compose([trn.Resize(32), trn.ToTensor(), trn.Normalize(mean, std)]), download=False)
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nSVHN Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Places365 ///////////////
-#
-#ood_data = dset.ImageFolder(root="/share/data/vision-greg2/places365/test_subset",
-#                            transform=trn.Compose([trn.Resize(32), trn.CenterCrop(32),
-#                                                   trn.ToTensor(), trn.Normalize(mean, std)]))
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nPlaces365 Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// LSUN ///////////////
-#
-#ood_data = lsun_loader.LSUN("/share/data/vision-greg2/users/dan/datasets/LSUN/lsun-master/data", classes='test',
-#                            transform=trn.Compose([trn.Resize(32), trn.CenterCrop(32),
-#                                                   trn.ToTensor(), trn.Normalize(mean, std)]))
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nLSUN Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// CIFAR Data ///////////////
-#
-#if 'cifar10_' in args.method_name:
-#    ood_data = dset.CIFAR100('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
-#else:
-#    ood_data = dset.CIFAR10('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
-#
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#
-#print('\n\nCIFAR-100 Detection') if 'cifar100' in args.method_name else print('\n\nCIFAR-10 Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Mean Results ///////////////
-#
-#print('\n\nMean Test Results')
-#print_measures(np.mean(auroc_list), np.mean(aupr_list), np.mean(fpr_list), method_name=args.method_name)
-#
-## /////////////// OOD Detection of Validation Distributions ///////////////
-#
-#if args.validate is False:
-#    exit()
-#
-#auroc_list, aupr_list, fpr_list = [], [], []
-#
-## /////////////// Uniform Noise ///////////////
-#
-#dummy_targets = torch.ones(ood_num_examples * args.num_to_avg)
-#ood_data = torch.from_numpy(
-#    np.random.uniform(size=(ood_num_examples * args.num_to_avg, 3, 32, 32),
-#                      low=-1.0, high=1.0).astype(np.float32))
-#ood_data = torch.utils.data.TensorDataset(ood_data, dummy_targets)
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True)
-#
-#print('\n\nUniform[-1,1] Noise Detection')
-#get_and_print_results(ood_loader)
-#
-#
-## /////////////// Arithmetic Mean of Images ///////////////
-#
-#if 'cifar10_' in args.method_name:
-#    ood_data = dset.CIFAR100('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
-#else:
-#    ood_data = dset.CIFAR10('/share/data/vision-greg/cifarpy', train=False, transform=test_transform)
-#
-#
-#class AvgOfPair(torch.utils.data.Dataset):
-#    def __init__(self, dataset):
-#        self.dataset = dataset
-#        self.shuffle_indices = np.arange(len(dataset))
-#        np.random.shuffle(self.shuffle_indices)
-#
-#    def __getitem__(self, i):
-#        random_idx = np.random.choice(len(self.dataset))
-#        while random_idx == i:
-#            random_idx = np.random.choice(len(self.dataset))
-#
-#        return self.dataset[i][0] / 2. + self.dataset[random_idx][0] / 2., 0
-#
-#    def __len__(self):
-#        return len(self.dataset)
-#
-#
-#ood_loader = torch.utils.data.DataLoader(AvgOfPair(ood_data),
-#                                         batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nArithmetic Mean of Random Image Pair Detection')
-#get_and_print_results(ood_loader)
-#
-#
-## /////////////// Geometric Mean of Images ///////////////
-#
-#if 'cifar10_' in args.method_name:
-#    ood_data = dset.CIFAR100('/share/data/vision-greg/cifarpy', train=False, transform=trn.ToTensor())
-#else:
-#    ood_data = dset.CIFAR10('/share/data/vision-greg/cifarpy', train=False, transform=trn.ToTensor())
-#
-#
-#class GeomMeanOfPair(torch.utils.data.Dataset):
-#    def __init__(self, dataset):
-#        self.dataset = dataset
-#        self.shuffle_indices = np.arange(len(dataset))
-#        np.random.shuffle(self.shuffle_indices)
-#
-#    def __getitem__(self, i):
-#        random_idx = np.random.choice(len(self.dataset))
-#        while random_idx == i:
-#            random_idx = np.random.choice(len(self.dataset))
-#
-#        return trn.Normalize(mean, std)(torch.sqrt(self.dataset[i][0] * self.dataset[random_idx][0])), 0
-#
-#    def __len__(self):
-#        return len(self.dataset)
-#
-#
-#ood_loader = torch.utils.data.DataLoader(
-#    GeomMeanOfPair(ood_data), batch_size=args.test_bs, shuffle=True,
-#    num_workers=args.prefetch, pin_memory=True)
-#
-#print('\n\nGeometric Mean of Random Image Pair Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Jigsaw Images ///////////////
-#
-#ood_loader = torch.utils.data.DataLoader(ood_data, batch_size=args.test_bs, shuffle=True,
-#                                         num_workers=args.prefetch, pin_memory=True)
-#
-#jigsaw = lambda x: torch.cat((
-#    torch.cat((torch.cat((x[:, 8:16, :16], x[:, :8, :16]), 1),
-#               x[:, 16:, :16]), 2),
-#    torch.cat((x[:, 16:, 16:],
-#               torch.cat((x[:, :16, 24:], x[:, :16, 16:24]), 2)), 2),
-#), 1)
-#
-#ood_loader.dataset.transform = trn.Compose([trn.ToTensor(), jigsaw, trn.Normalize(mean, std)])
-#
-#print('\n\nJigsawed Images Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Speckled Images ///////////////
-#
-#speckle = lambda x: torch.clamp(x + x * torch.randn_like(x), 0, 1)
-#ood_loader.dataset.transform = trn.Compose([trn.ToTensor(), speckle, trn.Normalize(mean, std)])
-#
-#print('\n\nSpeckle Noised Images Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Pixelated Images ///////////////
-#
-#pixelate = lambda x: x.resize((int(32 * 0.2), int(32 * 0.2)), PILImage.BOX).resize((32, 32), PILImage.BOX)
-#ood_loader.dataset.transform = trn.Compose([pixelate, trn.ToTensor(), trn.Normalize(mean, std)])
-#
-#print('\n\nPixelate Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// RGB Ghosted/Shifted Images ///////////////
-#
-#rgb_shift = lambda x: torch.cat((x[1:2].index_select(2, torch.LongTensor([i for i in range(32 - 1, -1, -1)])),
-#                                 x[2:, :, :], x[0:1, :, :]), 0)
-#ood_loader.dataset.transform = trn.Compose([trn.ToTensor(), rgb_shift, trn.Normalize(mean, std)])
-#
-#print('\n\nRGB Ghosted/Shifted Image Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Inverted Images ///////////////
-#
-## not done on all channels to make image ood with higher probability
-#invert = lambda x: torch.cat((x[0:1, :, :], 1 - x[1:2, :, ], 1 - x[2:, :, :],), 0)
-#ood_loader.dataset.transform = trn.Compose([trn.ToTensor(), invert, trn.Normalize(mean, std)])
-#
-#print('\n\nInverted Image Detection')
-#get_and_print_results(ood_loader)
-#
-## /////////////// Mean Results ///////////////
-#
-#print('\n\nMean Validation Results')
-#print_measures(np.mean(auroc_list), np.mean(aupr_list), np.mean(fpr_list), method_name=args.method_name)
