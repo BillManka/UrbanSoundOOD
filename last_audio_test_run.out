@@ -1,0 +1,23 @@
+Model restored! Epoch: 49
+Error Rate 6.47
+
+
+Error Detection
+			custom_valerdo_baseline
+FPR95:			66.33
+AUROC:			83.08
+AUPR:			41.02
+
+Length of OOD Dataset: 374
+Running length of ood score vector per batch: 200
+Running length of ood score vector per batch: 374
+			custom_valerdo_baseline
+FPR95:			100.00
+AUROC:			41.24
+AUPR:			3.94
+
+Shapes of score vectors: 
+in_score: (8358,)
+right_score: (7817,)
+wrong_score: (541,)
+out_score: (374,)

@@ -24,6 +24,7 @@ if __name__ == '__main__':
 #    import matplotlib.pyplot as plt
     from urbansounddataset import UrbanSoundDataset
     from sklearn.model_selection import train_test_split
+    import pandas as pd
 
     # go through rigamaroo to do ...utils.display_results import show_performance
 #    if __package__ is None:
@@ -68,7 +69,7 @@ if __name__ == '__main__':
 
     # Data, Config
     data_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_in')
-    annotations_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/reduced.csv')
+    annotations_path = Path('/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/in_annotations.csv')
     sample_rate = 22050
     num_samples = 88200
     seed = 43
@@ -102,6 +103,10 @@ if __name__ == '__main__':
     test_size = len(usd) - train_size
     train_split, test_split = random_split(usd, [train_size, test_size])
 
+    # Write the test data out for use in audio_test.py
+    # train_df = pd.DataFrame(test_split.data.numpy())
+    # train_df.to_csv('/Users/wim17006/UrbanSoundOOD/UrbanSound8k/audio_test.csv')
+
     train_loader = DataLoader(train_split, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_split, batch_size=args.batch_size)
 
@@ -129,7 +134,6 @@ if __name__ == '__main__':
         net = CNNNetwork()
     else:
         net = WideResNet(args.layers, num_classes, args.widen_factor, dropRate=args.droprate)
-
 
     start_epoch = 0
     # Restore model if desired
@@ -241,43 +245,43 @@ if __name__ == '__main__':
 
     print('Beginning Training\n')
 
-    # Main loop
-    for epoch in range(start_epoch, args.epochs):
-        # print(f'epoch: {epoch}')
-
-        state['epoch'] = epoch
-        begin_epoch = time.time()
-
-        train()
-        test()
-
-        # Save model
-        torch.save(net.state_dict(),
-                   os.path.join(args.save, args.dataset + calib_indicator + '_' + args.model +
-                                '_baseline_epoch_' + str(epoch) + '.pt'))
-        # Let us not waste space and delete the previous model
-        prev_path = os.path.join(args.save, args.dataset + calib_indicator + '_' + args.model +
-                                 '_baseline_epoch_' + str(epoch - 1) + '.pt')
-        if os.path.exists(prev_path): os.remove(prev_path)
-
-        # Show results
-        with open(os.path.join(args.save, args.dataset + calib_indicator + '_' + args.model +
-                                          '_baseline_training_results.csv'), 'a') as f:
-            f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' % (
-                (epoch + 1),
-                time.time() - begin_epoch,
-                state['train_loss'],
-                state['test_loss'],
-                100 - 100. * state['test_accuracy'],
-            ))
-
-        # # print state with rounded decimals
-        # print({k: round(v, 4) if isinstance(v, float) else v for k, v in state.items()})
-
-        print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
-            (epoch + 1),
-            int(time.time() - begin_epoch),
-            state['train_loss'],
-            state['test_loss'],
-            100 - 100. * state['test_accuracy'])
-        )
+#    # Main loop
+#    for epoch in range(start_epoch, args.epochs):
+#        # print(f'epoch: {epoch}')
+#
+#        state['epoch'] = epoch
+#        begin_epoch = time.time()
+#
+#        train()
+#        test()
+#
+#        # Save model
+#        torch.save(net.state_dict(),
+#                   os.path.join(args.save, args.dataset + calib_indicator + '_' + args.model +
+#                                '_baseline_epoch_' + str(epoch) + '.pt'))
+#        # Let us not waste space and delete the previous model
+#        prev_path = os.path.join(args.save, args.dataset + calib_indicator + '_' + args.model +
+#                                 '_baseline_epoch_' + str(epoch - 1) + '.pt')
+#        if os.path.exists(prev_path): os.remove(prev_path)
+#
+#        # Show results
+#        with open(os.path.join(args.save, args.dataset + calib_indicator + '_' + args.model +
+#                                          '_baseline_training_results.csv'), 'a') as f:
+#            f.write('%03d,%05d,%0.6f,%0.5f,%0.2f\n' % (
+#                (epoch + 1),
+#                time.time() - begin_epoch,
+#                state['train_loss'],
+#                state['test_loss'],
+#                100 - 100. * state['test_accuracy'],
+#            ))
+#
+#        # # print state with rounded decimals
+#        # print({k: round(v, 4) if isinstance(v, float) else v for k, v in state.items()})
+#
+#        print('Epoch {0:3d} | Time {1:5d} | Train Loss {2:.4f} | Test Loss {3:.3f} | Test Error {4:.2f}'.format(
+#            (epoch + 1),
+#            int(time.time() - begin_epoch),
+#            state['train_loss'],
+#            state['test_loss'],
+#            100 - 100. * state['test_accuracy'])
+##        )

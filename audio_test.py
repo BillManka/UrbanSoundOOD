@@ -65,7 +65,7 @@ test_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_in'
 annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/in_annotations.csv'
 usd_in = UrbanSoundDataset(annotations_path, test_path, mel_spectrogram, sample_rate,
         num_samples, device=device)
-test_loader = DataLoader(usd_in)
+test_loader = DataLoader(usd_in, batch_size=args.test_bs)
 
 
 net = CNNNetwork()
@@ -144,6 +144,9 @@ def get_ood_scores(loader, in_dist=False):
                     _right_score.append(-np.max(smax[right_indices], axis=1))
                     _wrong_score.append(-np.max(smax[wrong_indices], axis=1))
 
+#            if not in_dist:
+#                print(f'Running length of ood score vector per batch: {len(concat(_score))}')
+
     if in_dist:
         return concat(_score).copy(), concat(_right_score).copy(), concat(_wrong_score).copy()
     else:
@@ -162,6 +165,8 @@ print('\n\nError Detection')
 show_performance(wrong_score, right_score, method_name=args.method_name)
 
 # /////////////// OOD Detection ///////////////
+
+
 auroc_list, aupr_list, fpr_list = [], [], []
 
 
@@ -182,16 +187,31 @@ def get_and_print_results(ood_loader, num_to_avg=args.num_to_avg):
         print_measures(auroc, aupr, fpr, args.method_name)
 
 
-
 # /////////////// AUDIO - Gunshot //////////////
 ood_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_ood'
 
 ood_annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/out_annotations.csv'
 usd_out = UrbanSoundDataset(ood_annotations_path, ood_path, mel_spectrogram, sample_rate,
-        num_samples, device=device)
-ood_loader = DataLoader(usd_out)
-print('\n\nAudio - Gunshot detection')
-get_and_print_results(ood_loader)
+        num_samples, device=device, ood=True)
+print(f'\nLength of OOD Dataset: {len(usd_out)}')
+ood_loader = DataLoader(usd_out, batch_size=args.test_bs)
+
+# print('\n\nAudio - Gunshot detection')
+# get_and_print_results(ood_loader)
+
+out_score = get_ood_scores(ood_loader)
+show_performance(out_score, in_score, method_name=args.method_name)
+
+print('\nShapes of score vectors: ')
+print(f'in_score: {in_score.shape}')
+print(f'right_score: {right_score.shape}')
+print(f'wrong_score: {wrong_score.shape}')
+print(f'out_score: {out_score.shape}')
+
+print(f'\n\nMaximum Softmax Scores\n\n In_distribution_correct:  {right_score.mean()}')
+print(f'\n In_distribution_wrong: {wrong_score.mean()}\n\n')
+print(f'\n OOD_distribution: {out_score.mean()}\n\n')
+
 
 
 # /////////////// Gaussian Noise ///////////////

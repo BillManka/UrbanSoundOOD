@@ -37,7 +37,7 @@ class UrbanSoundDataset(Dataset):
         signal = self._cut_if_necessary(signal)
         signal = self._right_pad_if_necessary(signal)
         signal = self.transformation(signal)
-        return signal, label
+        return signal, label, audio_sample_path
 
     def _cut_if_necessary(self, signal):
         if signal.shape[1] > self.num_samples:
