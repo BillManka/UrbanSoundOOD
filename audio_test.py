@@ -50,8 +50,6 @@ if args.ngpu > 0:
 if args.ngpu == 0:
     device = 'cpu'
 
-
-
 sample_rate = 22050
 num_samples = 88200
 mel_spectrogram = torchaudio.transforms.MelSpectrogram(
@@ -65,11 +63,11 @@ test_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/audio_in'
 annotations_path = '/home/wim17006/UrbanSoundOOD/UrbanSound8K/metadata/in_annotations.csv'
 usd_in = UrbanSoundDataset(annotations_path, test_path, mel_spectrogram, sample_rate,
         num_samples, device=device)
-test_loader = DataLoader(usd_in, batch_size=args.test_bs)
-
+test_split = pickle.load(open('testsplit.pkl', 'rb'))
+test_loader = DataLoader(test_split, batch_size=args.test_bs)
+# test_loader = DataLoader(usd_in, batch_size=args.test_bs)
 
 net = CNNNetwork()
-
 
 start_epoch = 0
 # Restore model
@@ -109,7 +107,6 @@ expected_ap = ood_num_examples / (ood_num_examples + len(usd_in))
 
 concat = lambda x: np.concatenate(x, axis=0)
 to_np = lambda x: x.data.cpu().numpy()
-
 
 def get_ood_scores(loader, in_dist=False):
     _score = []

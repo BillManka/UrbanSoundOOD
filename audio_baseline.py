@@ -25,6 +25,7 @@ if __name__ == '__main__':
     from urbansounddataset import UrbanSoundDataset
     from sklearn.model_selection import train_test_split
     import pandas as pd
+    import pickle
 
     # go through rigamaroo to do ...utils.display_results import show_performance
 #    if __package__ is None:
@@ -102,6 +103,8 @@ if __name__ == '__main__':
     train_size = int(len(usd) * 0.8)
     test_size = len(usd) - train_size
     train_split, test_split = random_split(usd, [train_size, test_size])
+
+    # test_pkl = pickle.dump(test_split, open('testsplit.pkl', 'wb'))
 
     # Write the test data out for use in audio_test.py
     # train_df = pd.DataFrame(test_split.data.numpy())
